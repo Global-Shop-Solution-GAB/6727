@@ -1,0 +1,158 @@
+Program.Sub.ScreenSU.Start
+Gui.fmDate..Create
+Gui.fmDate..Caption("Positive Pay ")
+Gui.fmDate..Size(4935,2070)
+Gui.fmDate..MinX(0)
+Gui.fmDate..MinY(0)
+Gui.fmDate..Position(0,0)
+Gui.fmDate..BackColor(-2147483633)
+Gui.fmDate..MousePointer(0)
+Gui.fmDate..Event(UnLoad,fmDate_UnLoad)
+Gui.fmDate.dtpSd.Create(DatePicker)
+Gui.fmDate.dtpSd.Size(1935,285)
+Gui.fmDate.dtpSd.Position(105,645)
+Gui.fmDate.dtpEd.Create(DatePicker)
+Gui.fmDate.dtpEd.Size(1935,285)
+Gui.fmDate.dtpEd.Position(2685,645)
+Gui.fmDate.lbl1.Create(Label,"Please select a date range for the Positive Pay output",True,4515,255,0,120,105,True,0,"Arial",8,-2147483633,0)
+Gui.fmDate.lbl1.FontStyle(True,False,False,False,False)
+Gui.fmDate.lblSt.Create(Label,"Start date",True,1935,255,0,105,420,True,0,"Arial",8,-2147483633,0)
+Gui.fmDate.lblEd.Create(Label,"End date",True,1935,255,0,2685,420,True,0,"Arial",8,-2147483633,0)
+Gui.fmDate.cmdOK.Create(Button)
+Gui.fmDate.cmdOK.Size(855,375)
+Gui.fmDate.cmdOK.Position(1950,1065)
+Gui.fmDate.cmdOK.Caption("OK")
+Gui.fmDate.cmdOK.Event(Click,Data)
+Program.Sub.ScreenSU.End
+
+Program.Sub.Preflight.Start
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+F.Intrinsic.Control.Try
+
+F.Intrinsic.Control.CallSub(SetIcon)
+Gui.fmDate..Show
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(Error,"SubRoutine",V.Ambient.CurrentSubroutine,"eNumber",V.Ambient.ErrorNumber,"eDescription",V.Ambient.ErrorDescription)
+F.Intrinsic.Control.EndTry
+Program.Sub.Main.End
+
+Program.Sub.Data.Start
+F.Intrinsic.Control.Try
+V.Local.sSQL.Declare
+V.Local.sStartDate.Declare
+V.Local.sEndDate.Declare
+V.Local.iCNT.Declare
+V.Local.sPayee.Declare
+V.Local.sCk_Vd.Declare
+V.Local.sManual.Declare
+V.Local.sAmnt.Declare
+
+V.Local.sStartDate.Set(V.Screen.fmDate!dtpSd.Value.PervasiveDate)
+V.Local.sEndDate.Set(V.Screen.fmDate!dtpEd.Value.PervasiveDate)
+
+F.Intrinsic.String.Replace(V.Local.sStartDate,"-","",V.Local.sStartDate)
+F.Intrinsic.String.Replace(V.Local.sEndDate,"-","",V.Local.sEndDate)
+
+F.ODBC.Connection!conts.OpenCompanyConnection
+F.Intrinsic.String.Build("Select RTRIM(CK_NO) as CK_NO,RTRIM(CK_MDYY) as CK_MDYY,AMOUNT,RTRIM(PAYEE) as PAYEE,RTRIM(CK_OR_VOID) as CK_OR_VOID from CHECKS_LOG where CK_DATE between '{0}' and '{1}'",V.Local.sStartDate,V.Local.sEndDate,V.Local.sSQL)
+F.Data.DataTable.CreateFromSQL("dtChecks","conts",V.Local.sSQL,True)
+
+F.Intrinsic.Control.For(V.Local.iCNT,0,V.DataTable.dtChecks.RowCount--,1)
+	V.Local.sPayee.Set(V.DataTable.dtChecks(V.Local.icnt).PAYEE!FieldValTrim)
+	F.Intrinsic.String.Replace(V.Local.sPayee,",","",V.Local.sPayee)
+	F.Intrinsic.String.Replace(V.Local.sPayee,".","",V.Local.sPayee)
+	F.Intrinsic.String.Replace(V.Local.sPayee,"#","",V.Local.sPayee)
+	F.Intrinsic.String.Replace(V.Local.sPayee,"'","",V.Local.sPayee)
+	F.Intrinsic.String.Replace(V.Local.sPayee,"-"," ",V.Local.sPayee)
+	F.Intrinsic.String.Replace(V.Local.sPayee,"&","AND",V.Local.sPayee)
+	F.Data.DataTable.SetValue("dtChecks",V.Local.iCNT,"PAYEE",V.Local.sPayee.PSQLFriendly)
+	
+	V.Local.sCk_Vd.Set(V.DataTable.dtChecks(V.Local.iCNT).CK_OR_VOID!FieldValTrim)
+	F.Intrinsic.Control.If(V.Local.sCk_Vd.Trim,=,"C")
+		F.Data.DataTable.SetValue("dtChecks",V.Local.iCNT,"CK_OR_VOID","I")
+	F.Intrinsic.Control.EndIf
+
+	V.Local.sManual.Set(V.DataTable.dtChecks(V.Local.iCNT).CK_NO!FieldValTrim)
+	F.Intrinsic.Control.If(V.Local.sManual.Trim,=,"999999")
+		F.Data.DataTable.DeleteRow("dtChecks",V.Local.iCNT)
+	F.Intrinsic.Control.EndIf
+F.Intrinsic.Control.Next(V.Local.iCNT)
+
+F.ODBC.Connection!conts.Close
+
+F.Intrinsic.Control.CallSub(CreateFile)
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(Error,"SubRoutine",V.Ambient.CurrentSubroutine,"eNumber",V.Ambient.ErrorNumber,"eDescription",V.Ambient.ErrorDescription)
+F.Intrinsic.Control.EndTry
+Program.Sub.Data.End
+
+Program.Sub.CreateFile.Start
+F.Intrinsic.Control.Try
+V.Local.sPath.Declare
+V.Local.sSQL.Declare
+
+F.Intrinsic.UI.ShowSaveFileDialog("","csv|*.csv",V.Local.sPath)
+
+F.Intrinsic.String.Split(V.Local.sPath,".",V.Local.sPath)
+
+F.Intrinsic.String.Build("{0}.csv",V.Local.sPath(0),V.Local.sPath)
+
+F.Data.Datatable.SaveToCSV("dtChecks",V.Local.sPath.Trim,False)
+
+F.Intrinsic.String.Build("File saved to {0}",V.Local.sPath.Trim,V.Local.sSQL)
+
+F.Intrinsic.UI.Msgbox(V.Local.sSQL,"Success!")
+
+F.Intrinsic.Control.End
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(Error,"SubRoutine",V.Ambient.CurrentSubroutine,"eNumber",V.Ambient.ErrorNumber,"eDescription",V.Ambient.ErrorDescription)
+F.Intrinsic.Control.EndTry
+Program.Sub.CreateFile.End
+
+Program.Sub.fmDate_UnLoad.Start
+F.Intrinsic.Control.End
+Program.Sub.fmDate_UnLoad.End
+
+Program.Sub.SetIcon.Start
+F.Intrinsic.Control.Try
+V.Local.sForm.Declare
+V.Local.bExists.Declare
+V.Local.sIcon.Declare
+V.Local.iCounter.Declare
+
+F.Intrinsic.String.Build("{0}\ART\gss2.ico",V.Caller.GlobalDir,v.Local.sIcon)
+F.Intrinsic.File.Exists(V.Local.sIcon, V.Local.bExists)
+F.Intrinsic.Control.If(V.Local.bExists.Not)
+    F.Intrinsic.String.Build("{0}\GAB\GAS\gss2.ico",V.Caller.PluginsDir,v.Local.sIcon)
+    F.Intrinsic.File.Exists(V.Local.sIcon, V.Local.bExists)
+    F.Intrinsic.Control.If(V.Local.bExists.Not)
+        F.Intrinsic.Control.ExitSub
+    F.Intrinsic.Control.EndIf
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.UI.GetFormList(V.Local.sForm)
+F.Intrinsic.String.Split(V.Local.sForm, "*!*", V.Local.sForm)
+
+F.Intrinsic.Control.For(V.Local.iCounter, 0, V.Local.sForm.UBound, 1)
+    Gui.[V.Local.sForm(V.Local.iCounter)]..Icon(V.Local.sIcon)
+F.Intrinsic.Control.Next(V.Local.iCounter)
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(Error,"SubRoutine",V.Ambient.CurrentSubroutine,"eNumber",V.Ambient.ErrorNumber,"eDescription",V.Ambient.ErrorDescription)
+F.Intrinsic.Control.EndTry
+Program.Sub.SetIcon.End
+
+Program.Sub.Error.Start
+V.Local.sError.Declare
+V.Local.iRet.Declare
+V.Local.sSep.Declare
+
+F.Intrinsic.String.Build("-------------------------------------------------------------------------------------",,V.Local.sSep)
+F.Intrinsic.String.Build("({5}-{6}){0}{7}{0}Project: {4}{0}{7}{0}Sub: {1}{0}Error: {2}, {3}", V.Ambient.NewLine, V.Args.SubRoutine, V.Args.eNumber, V.Args.eDescription,V.Caller.ScriptFile,V.Ambient.Date, V.Ambient.Time,V.Local.sSep,V.Local.sError)
+F.Intrinsic.UI.Msgbox(V.Local.sError,"Error",V.Local.iRet)
+Program.Sub.Error.End
